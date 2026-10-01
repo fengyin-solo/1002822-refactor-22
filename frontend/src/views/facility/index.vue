@@ -63,7 +63,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 
 import { request } from '@/api/client'
 
@@ -73,13 +73,19 @@ const ENDPOINT = '/api/facility'
 const columns = ["设施编号", "设施名称", "设施类型", "所在绿地", "安装日期", "上次检修", "损坏描述", "设施状态"]
 const actions = ["登记损坏", "安排修复", "验收修复"]
 const statuses = ["完好", "轻微损坏", "严重损坏", "已修复"]
-const stats = [{"label": "完好设施", "value": 0}, {"label": "损坏设施", "value": 0}, {"label": "已修复设施", "value": 0}]
 
 const rows = ref<Row[]>([])
 const total = ref(0)
 const errorMessage = ref('')
 const filters = ref<Record<string, string>>({})
 const filterFields = columns.slice(0, 3)
+
+// 统计卡跟着明细走：等级以列表里每行的设施状态为准
+const stats = computed(() => [
+  { label: '完好设施', value: rows.value.filter((row) => row['设施状态'] === '完好').length },
+  { label: '损坏设施', value: rows.value.filter((row) => row['设施状态'] === '轻微损坏' || row['设施状态'] === '严重损坏').length },
+  { label: '已修复设施', value: rows.value.filter((row) => row['设施状态'] === '已修复').length },
+])
 
 function resetFilters() {
   filters.value = {}
@@ -101,8 +107,9 @@ async function runAction(action: string, row: Row) {
       method: 'POST',
       body: JSON.stringify({ action }),
     })
-    if (!response.ok) {
-      throw new Error('园建设施动作未生效，请稍后重试')
+    const payload = await response.json()
+    if (!response.ok || !payload.ok) {
+      throw new Error(payload.message ?? '园建设施动作未生效，请稍后重试')
     }
     await reload()
   } catch (error) {
@@ -111,7 +118,6 @@ async function runAction(action: string, row: Row) {
 }
 
 async function reload() {
-  errorMessage.value = ''
   const query = new URLSearchParams(filters.value as Record<string, string>).toString()
   try {
     const response = await request(`${ENDPOINT}?${query}`)
@@ -121,7 +127,9 @@ async function reload() {
     const payload = await response.json()
     rows.value = payload.items ?? []
     total.value = payload.total ?? rows.value.length
+    errorMessage.value = ''
   } catch (error) {
+    // 失败原因（含接口超时）留在页面上，直到下一次加载成功才清掉
     errorMessage.value = error instanceof Error ? error.message : '园建设施列表读取失败'
   }
 }

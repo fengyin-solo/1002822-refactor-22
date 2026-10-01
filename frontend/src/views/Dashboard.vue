@@ -25,6 +25,10 @@
         </tr>
       </tbody>
     </table>
+    <footer class="page-foot">
+      <span>数据来自各业务模块明细汇总</span>
+      <span v-if="errorMessage" class="error-text">{{ errorMessage }}</span>
+    </footer>
   </section>
 </template>
 
@@ -40,13 +44,17 @@ type Overview = {
 
 const cards = ref<Overview['cards']>([])
 const moduleRows = ref<Overview['modules']>([])
+const errorMessage = ref('')
 
 onMounted(async () => {
   try {
     const payload = await fetchJson<Overview>('/api/overview')
     cards.value = payload.cards
     moduleRows.value = payload.modules
-  } catch {
+    errorMessage.value = ''
+  } catch (error) {
+    // 失败原因（含接口超时）留在页面上，卡片与明细回退为空数据占位
+    errorMessage.value = error instanceof Error ? error.message : '运营概览读取失败'
     cards.value = [{"label": "业务模块", "value": 0}, {"label": "今日新增", "value": 0}]
     moduleRows.value = [{"name": "绿地台账", "created": 0, "pending": 0, "abnormal": 0}, {"name": "乔木管理", "created": 0, "pending": 0, "abnormal": 0}, {"name": "灌木管理", "created": 0, "pending": 0, "abnormal": 0}, {"name": "草坪管理", "created": 0, "pending": 0, "abnormal": 0}, {"name": "花卉造景", "created": 0, "pending": 0, "abnormal": 0}, {"name": "病虫害防治", "created": 0, "pending": 0, "abnormal": 0}, {"name": "灌溉作业", "created": 0, "pending": 0, "abnormal": 0}, {"name": "施肥作业", "created": 0, "pending": 0, "abnormal": 0}, {"name": "修剪造型", "created": 0, "pending": 0, "abnormal": 0}, {"name": "绿地巡查", "created": 0, "pending": 0, "abnormal": 0}, {"name": "杂草清除", "created": 0, "pending": 0, "abnormal": 0}, {"name": "树木支撑", "created": 0, "pending": 0, "abnormal": 0}, {"name": "苗木移植", "created": 0, "pending": 0, "abnormal": 0}, {"name": "园建设施", "created": 0, "pending": 0, "abnormal": 0}, {"name": "园林机械", "created": 0, "pending": 0, "abnormal": 0}, {"name": "苗木基地", "created": 0, "pending": 0, "abnormal": 0}, {"name": "水体养护", "created": 0, "pending": 0, "abnormal": 0}, {"name": "名木古树", "created": 0, "pending": 0, "abnormal": 0}, {"name": "市民热线", "created": 0, "pending": 0, "abnormal": 0}, {"name": "季度养护方案", "created": 0, "pending": 0, "abnormal": 0}]
   }
