@@ -12,7 +12,7 @@ router = APIRouter(prefix="/api/facility", tags=["园建设施"])
 
 service = FacilityService()
 
-LIST_FIELDS = ["设施编号", "设施名称", "设施类型", "所在绿地", "安装日期", "上次检修", "损坏描述", "设施状态"]
+LIST_FIELDS = ["设施编号", "设施名称", "设施类型", "所在绿地", "安装日期", "上次检修", "损坏描述", "损坏等级", "设施状态"]
 STATUSES = ["完好", "轻微损坏", "严重损坏", "已修复"]
 
 
@@ -48,11 +48,22 @@ def create_entry(payload: EntryPayload) -> ActionResult:
     return ActionResult(ok=True, message="园建设施已登记", entry=entry)
 
 
+@router.post("/backfill", response_model=ActionResult)
+def backfill_entries() -> ActionResult:
+    """按统一口径回填全部园建设施的损坏等级；旧检修记录不改，只追加回填记录。"""
+    summary = service.backfill()
+    message = (
+        f"已按统一口径回填 {summary['total']} 条园建设施，"
+        f"重算 {summary['changed']} 条，联动树木支撑 {summary['support_synced']} 条"
+    )
+    return ActionResult(ok=True, message=message, entry=summary)
+
+
 @router.post("/{entry_id}/actions", response_model=ActionResult)
 def run_action(entry_id: int, payload: EntryPayload) -> ActionResult:
-    """对单条园建设施执行登记损坏、安排修复、验收修复；不允许的动作会被拦下并说明原因。"""
+    """对单条园建设施执行登记损坏、安排修复、验收修复；三个动作按同一份口径判定损坏等级。"""
     action = str(payload.values.get("action") or "").strip()
-    entry, message = service.run_action(entry_id, action)
+    entry, message = service.run_action(entry_id, action, payload.values)
     if entry is None:
         return ActionResult(ok=False, message=message)
     return ActionResult(ok=True, message=message, entry=entry)
